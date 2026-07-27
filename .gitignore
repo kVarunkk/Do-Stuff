@@ -1,0 +1,7 @@
+.env
+.env.local
+venv/
+.venv/
+traces.jsonl
+*.log
+__pycache__/

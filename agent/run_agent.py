@@ -1,0 +1,132 @@
+from lib.session_store import  SessionStore
+from lib.tracing import  session_id_var, turn_id_var
+import asyncio
+import uuid
+from lib.tracing import tracer
+from opentelemetry.trace import Status, StatusCode
+from helpers.agent.constants import COMMANDS, MAX_ITERATIONS
+from helpers.agent.extract_text import extract_text
+from helpers.agent.print_history import print_history
+from agent.call_agent import call_agent
+from agent.run_tool import run_tool
+
+async def run_agent(session_id: str, store: SessionStore) -> None:
+    session_id_var.set(session_id)
+    steps_history = await store.load(session_id)
+
+    while True:
+
+        user_text = await asyncio.to_thread(input, "User: ")
+
+        if not user_text:
+            continue
+
+        command = user_text.strip().lower()
+
+        if command == "/exit":
+            print(f"Ending session. Session ID: {session_id}")
+            break
+
+        if command == "/history":
+            print_history(steps_history)
+            continue
+
+        if command == "/clear":
+            steps_history = []
+            await store.save(session_id, steps_history)
+            print("History cleared.")
+            continue
+
+        if command == "/help":
+            print(f"Commands: {', '.join(sorted(COMMANDS))}")
+            continue
+
+        turn_id = str(uuid.uuid4())
+        turn_id_var.set(turn_id)
+
+        user_step = {
+                "type": "user_input",
+                "content": [{"type": "text", "text": user_text}],
+            }
+
+        steps_history.append(
+            user_step
+        )
+        await store.append(session_id, user_step)
+
+        iteration = 0
+
+        with tracer.start_as_current_span("turn") as turn_span:
+            turn_span.set_attribute("session_id", session_id)
+            turn_span.set_attribute("turn_id", turn_id)
+            turn_span.set_attribute("user_input", user_text)
+
+            while iteration < MAX_ITERATIONS:
+                iteration += 1
+
+                with tracer.start_as_current_span("iteration") as iter_span:
+                    iter_span.set_attribute("iteration_number", iteration)
+    
+                    interaction = await call_agent(steps_history=steps_history)
+                    interaction_steps = getattr(interaction, "steps", None)
+        
+                    if not interaction_steps:
+                        iter_span.set_status(Status(StatusCode.OK))
+                        continue
+        
+                    for step in interaction_steps:
+                        dumped = step.model_dump()
+                        steps_history.append(dumped)
+                        await store.append(session_id, dumped)
+        
+                    last_step = interaction_steps[-1]
+                    if getattr(last_step, "type", None) == "model_output":
+                        final_text = extract_text(last_step)
+                        if final_text is not None:
+                            turn_span.set_attribute("outcome", "success")
+                            turn_span.set_status(Status(StatusCode.OK))
+                            iter_span.set_status(Status(StatusCode.OK))
+                            print(f"FINAL OUTPUT: {final_text}")
+                            break
+        
+                    calls = [
+                        (
+                            getattr(step, "name", None),
+                            getattr(step, "arguments", None) or {},
+                            getattr(step, "id", None),
+                        )
+                        for step in interaction_steps
+                        if getattr(step, "type", None) == "function_call"
+                    ]
+        
+                    if not calls:
+                        iter_span.set_status(Status(StatusCode.OK)) 
+                        continue
+        
+                    for fn_name, fn_args, _ in calls:
+                        print(f"-> Calling local tool: {fn_name}({fn_args})")
+        
+                    results = await asyncio.gather(
+                        *(run_tool(fn_name=fn_name, fn_args=dict(fn_args)) for fn_name, fn_args, _ in calls),
+                        return_exceptions=True,
+                    )
+        
+                    for (fn_name, _, fn_id), result in zip(calls, results):
+                        if isinstance(result, Exception):
+                            result = f"Error: {result}"
+        
+                        result_step = {
+                            "name": fn_name,
+                            "result": result,
+                            "id": fn_id,
+                            "type": "function_result",
+                        }
+                        steps_history.append(result_step)
+                        await store.append(session_id, result_step)   
+
+                        iter_span.set_status(Status(StatusCode.OK)) 
+
+            else:
+                # loop exhausted MAX_ITERATIONS without breaking
+                turn_span.set_attribute("outcome", "max_iterations_exceeded")  
+                turn_span.set_status(Status(StatusCode.ERROR, "max_iterations_exceeded"))       
