@@ -17,7 +17,7 @@
 
 ## Guidelines
 
-- reAct loop is present in `agent/run_tool.py`
+- reAct loop is present in `agent/run_agent.py`
 - to create a new tool:
   - add a new file in the `tools` directory with name matching that of the tool func
   - update `tools/definitions.py`
