@@ -1,4 +1,3 @@
-from helpers.agent.constants import SYSTEM_INSTRUCTIONS
 from typing import Any
 from lib.tracing import traced
 from google.genai import types
@@ -12,7 +11,7 @@ load_dotenv()
 model = os.getenv("MODEL")
 
 @traced("model_call")
-async def call_agent(steps_history: list[types.Step]) -> Any:
+async def call_agent(steps_history: list[types.Step], system_instruction: str) -> Any:
     client = get_client()
     interaction = await client.interactions.create(
         model=model,
@@ -20,7 +19,7 @@ async def call_agent(steps_history: list[types.Step]) -> Any:
         tools=[{"type": "function", **schedule_meeting_schema}],
         # opt out of server side state storage
         store=False,
-        system_instruction=SYSTEM_INSTRUCTIONS,
+        system_instruction=system_instruction,
     )
 
     usage = getattr(interaction, "usage", None)

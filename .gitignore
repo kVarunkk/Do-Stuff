@@ -5,3 +5,4 @@ venv/
 traces.jsonl
 *.log
 __pycache__/
+chroma_data
