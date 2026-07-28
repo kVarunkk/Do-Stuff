@@ -9,10 +9,16 @@ from helpers.agent.extract_text import extract_text
 from helpers.agent.print_history import print_history
 from agent.call_agent import call_agent
 from agent.run_tool import run_tool
+from helpers.agent.manage_context import compact_context
+from helpers.agent.get_model_token_limit import get_model_token_limit
 
 async def run_agent(session_id: str, store: SessionStore) -> None:
     session_id_var.set(session_id)
     steps_history = await store.load(session_id)
+    last_input_tokens = 0
+
+    token_limit = await get_model_token_limit()
+    context_token_threshold = int(token_limit * 0.8)
 
     while True:
 
@@ -66,8 +72,16 @@ async def run_agent(session_id: str, store: SessionStore) -> None:
 
                 with tracer.start_as_current_span("iteration") as iter_span:
                     iter_span.set_attribute("iteration_number", iteration)
-    
+
+                    if last_input_tokens > context_token_threshold:
+                        steps_history = await compact_context(steps_history)
+
                     interaction = await call_agent(steps_history=steps_history)
+
+                    usage = getattr(interaction, "usage", None)
+                    if usage:
+                        last_input_tokens = getattr(usage, "total_input_tokens", last_input_tokens)
+ 
                     interaction_steps = getattr(interaction, "steps", None)
         
                     if not interaction_steps:

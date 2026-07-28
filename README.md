@@ -5,8 +5,8 @@
 - reAct tool calling
 - opentelemetry tracing
 - In memory store: short term memory
+- context management
 - long term memory (coming soon)
-- context management (coming soon)
 
 ## Setup
 
