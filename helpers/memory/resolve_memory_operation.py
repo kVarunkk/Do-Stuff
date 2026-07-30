@@ -9,11 +9,11 @@ model = os.getenv("MODEL")
 client = get_client()
 
 async def resolve_memory_operation(user_id: str, new_fact: dict, memory_store) -> None:
-    similar = await memory_store.query_raw(user_id, new_fact["value"], top_k=3)
+    similar = await memory_store.query(user_id, new_fact["value"], top_k=3)
 
     if not similar:
-        print(f"FACT SAVED IN LONG TERM MEMORY-> OPERATION: SIMILAR NOT FOUND, KEY: {new_fact["key"] or "unknown"}, VALUE: {new_fact["value"]}")
         await memory_store.upsert_fact(user_id, new_fact)
+        print(f"FACT SAVED IN LONG TERM MEMORY-> OPERATION: SIMILAR NOT FOUND, KEY: {new_fact["key"] or "unknown"}, VALUE: {new_fact["value"]}")
         return
 
     decision_prompt = f"""You manage a user's long-term memory. Given a NEW fact and

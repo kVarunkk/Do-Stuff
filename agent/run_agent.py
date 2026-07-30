@@ -4,7 +4,7 @@ import asyncio
 import uuid
 from lib.tracing import tracer
 from opentelemetry.trace import Status, StatusCode
-from helpers.agent.constants import COMMANDS, MAX_ITERATIONS, SYSTEM_INSTRUCTIONS
+from helpers.agent.constants import COMMANDS, MAX_ITERATIONS
 from helpers.agent.extract_text import extract_text
 from helpers.agent.print_history import print_history
 from agent.call_agent import call_agent
@@ -13,8 +13,9 @@ from helpers.agent.manage_context import compact_context
 from helpers.agent.get_model_token_limit import get_model_token_limit
 from lib.memory_store import MemoryStore
 from helpers.agent.save_memories_and_exit import save_memories_and_exit
+from lib.exceptions import ConfirmationRequired
 
-async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_store: MemoryStore) -> None:
+async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_store: MemoryStore, system_instructions:str) -> None:
     session_id_var.set(session_id)
     steps_history = await store.load(session_id)
     last_input_tokens = 0
@@ -61,10 +62,13 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
             )
             await store.append(session_id, user_step)
     
+            # memories = await memory_store.query(user_id, query_text=user_text, top_k=5)
+            # memory_text = "\n".join(f"- {m}" for m in memories)
+
             memories = await memory_store.query(user_id, query_text=user_text, top_k=5)
-            memory_text = "\n".join(f"- {m}" for m in memories)
+            memory_text = "\n".join(f"- {m['key']}: {m['value']}" for m in memories)
     
-            dynamic_system_instruction = SYSTEM_INSTRUCTIONS
+            dynamic_system_instruction = system_instructions
             if memory_text:
                 dynamic_system_instruction += f"\n\nRelevant context about this user:\n{memory_text}"
     
@@ -115,7 +119,7 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
                                 print(f"Agent: {final_text}")
                                 break
             
-                        calls = [
+                        function_calls = [
                             (
                                 getattr(step, "name", None),
                                 getattr(step, "arguments", None) or {},
@@ -125,22 +129,36 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
                             if getattr(step, "type", None) == "function_call"
                         ]
             
-                        if not calls:
+                        if not function_calls:
                             iter_span.set_status(Status(StatusCode.OK)) 
                             continue
             
-                        for fn_name, fn_args, _ in calls:
+                        for fn_name, fn_args, _ in function_calls:
                             print(f"-> Calling local tool: {fn_name}({fn_args})")
             
                         results = await asyncio.gather(
-                            *(run_tool(fn_name=fn_name, fn_args=dict(fn_args)) for fn_name, fn_args, _ in calls),
+                            *(run_tool(fn_name=fn_name, fn_args=dict(fn_args)) for fn_name, fn_args, _ in function_calls),
                             return_exceptions=True,
                         )
-            
-                        for (fn_name, _, fn_id), result in zip(calls, results):
-                            if isinstance(result, Exception):
+
+                        final_results = []
+                        for (fn_name, fn_args, fn_id), result in zip(function_calls, results):
+                            if isinstance(result, ConfirmationRequired):
+                                print(f"\nConfirmation needed: {result.message}")
+                                confirm = await asyncio.to_thread(input, "Allow this? [y/n]: ")
+                        
+                                if confirm.strip().lower() == "y":
+                                    resumed_args = {**fn_args, **result.resume_args}
+                                    result = await run_tool(fn_name=fn_name, fn_args=resumed_args)
+                                else:
+                                    result = "Error: User declined to allow this action."
+                        
+                            elif isinstance(result, Exception):
                                 result = f"Error: {result}"
-            
+                        
+                            final_results.append((fn_name, fn_id, result))
+                        
+                        for fn_name, fn_id, result in final_results:
                             result_step = {
                                 "name": fn_name,
                                 "result": result,
@@ -148,9 +166,23 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
                                 "type": "function_result",
                             }
                             steps_history.append(result_step)
-                            await store.append(session_id, result_step)   
+                            await store.append(session_id, result_step)
+                            iter_span.set_status(Status(StatusCode.OK))
+            
+                        # for (fn_name, _, fn_id), result in zip(function_calls, results):
+                        #     if isinstance(result, Exception):
+                        #         result = f"Error: {result}"
+            
+                        #     result_step = {
+                        #         "name": fn_name,
+                        #         "result": result,
+                        #         "id": fn_id,
+                        #         "type": "function_result",
+                        #     }
+                        #     steps_history.append(result_step)
+                        #     await store.append(session_id, result_step)   
     
-                            iter_span.set_status(Status(StatusCode.OK)) 
+                        #     iter_span.set_status(Status(StatusCode.OK)) 
     
                 else:
                     turn_span.set_attribute("outcome", "max_iterations_exceeded")  

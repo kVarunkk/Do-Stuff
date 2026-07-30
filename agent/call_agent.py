@@ -2,10 +2,10 @@ from typing import Any
 from lib.tracing import traced
 from google.genai import types
 from lib.genai_client import get_client
-from tools.definitions import schedule_meeting_schema
 from opentelemetry import trace as otel_trace
 import os
 from dotenv import load_dotenv
+from tools.definitions import tool_schemas
 
 load_dotenv()  
 model = os.getenv("MODEL")
@@ -16,8 +16,7 @@ async def call_agent(steps_history: list[types.Step], system_instruction: str) -
     interaction = await client.interactions.create(
         model=model,
         input=steps_history,
-        tools=[{"type": "function", **schedule_meeting_schema}],
-        # opt out of server side state storage
+        tools=[{"type": "function", **schema} for schema in tool_schemas],
         store=False,
         system_instruction=system_instruction,
     )

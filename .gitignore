@@ -6,3 +6,4 @@ traces.jsonl
 *.log
 __pycache__/
 chroma_data
+agent_workspace

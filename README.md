@@ -7,6 +7,7 @@
 - short term memory
 - long term memory
 - context management
+- skill support
 
 ## Setup
 
@@ -15,10 +16,23 @@
 - run `pip install -r requirements.txt`
 - run `python app.py`
 
+## Tools
+
+- `write_file`
+- `read_file`
+- `list_files`
+- `delete_file`
+- `read_skill`
+
 ## Guidelines
 
-- reAct loop is present in `agent/run_agent.py`
-- to create a new tool:
+- Main agent code is present in `agent/run_agent.py`
+- To create a new tool:
   - add a new file in the `tools` directory with name matching that of the tool func
   - update `tools/definitions.py`
-  - update the `TOOL_MAP` in `helpers/agent/constants.py`
+- New files will be created in the `agent_workspace` directory
+- Add skills in the `skill` directory. Sample skills present. Refer [this](https://agentskills.io/home) for more info.
+
+### Long Term Memory
+
+- Long term memories are saved on exit.

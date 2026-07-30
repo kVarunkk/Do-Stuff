@@ -18,7 +18,7 @@ async def compact_context(steps_history: list[dict]) -> list[dict]:
     summary_prompt = (
         "Summarize the key facts, decisions, and outcomes from this conversation "
         "history in a compact paragraph. Preserve names, dates, and any commitments "
-        "made (e.g. meetings scheduled). Do not include reasoning or tool call mechanics.\n\n"
+        "made. Do not include reasoning or tool call mechanics.\n\n"
         f"{json.dumps(old_steps, default=str)}"
     )
 
