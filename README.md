@@ -8,6 +8,7 @@
 - long term memory
 - context management
 - skill support
+- mcp servers support (stdio)
 
 ## Setup
 
@@ -36,3 +37,7 @@
 ### Long Term Memory
 
 - Long term memories are saved on exit.
+
+### MCP Servers
+
+- Add mcp servers in the `mcp_config.json`

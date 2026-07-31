@@ -8,19 +8,51 @@ from lib.memory_store import ChromaMemoryStore
 from helpers.agent.save_memories_and_exit import save_memories_and_exit
 from helpers.skills.discover_skills import discover_skills
 from helpers.agent.constants import SYSTEM_INSTRUCTIONS
+from lib.mcp_client import MCPClient
+from helpers.mcp.load_mcp_config import load_mcp_config
 
 async def main(session_id: str, user_id: str, system_instructions: str):
     client = get_client()
     store = InMemorySessionStore()
     memory_store = ChromaMemoryStore()
+    mcp_client = MCPClient()
+
+    mcp_servers = load_mcp_config("mcp_config.json")
 
     try:
+
+        if mcp_servers:
+             print("\nConnecting to MCP servers from mcp_config.json...")
+             for server_name, server_cfg in mcp_servers.items():
+                 command = server_cfg.get("command")
+                 args = server_cfg.get("args", [])
+ 
+                 if not command:
+                     print(f"⚠️ Skipping '{server_name}': Missing 'command' field.")
+                     continue
+ 
+                 try:
+                     await mcp_client.connect_to_server(
+                         server_name=server_name,
+                         command=command,
+                         args=args
+                     )
+                     print(f" Connected to server '{server_name}'")
+                 except Exception as e:
+                     print(f"❌ Failed to connect to MCP server '{server_name}': {e}")
+ 
+             print(f"Initialized {len(mcp_client.servers)} MCP server(s).\n")
+        else:
+             print("No active MCP servers loaded. Running with local tools only.\n")
+
+
         await run_agent(
             session_id=session_id,
             user_id=user_id,
             store=store,
             memory_store=memory_store,
             system_instructions=system_instructions,
+            mcp_client=mcp_client,
         )
     except (KeyboardInterrupt, asyncio.CancelledError):
         print("\nInterrupted. Saving memories before exit...")
@@ -29,7 +61,8 @@ async def main(session_id: str, user_id: str, system_instructions: str):
         if recovered_history:
             await save_memories_and_exit(recovered_history, user_id, memory_store)
     finally:
-        # Close client ONLY at the very end
+        print("Cleaning up MCP server processes...")
+        await mcp_client.cleanup()
         print("Closing API client...")
         await client.aclose()
         print("Client closed. Done.")

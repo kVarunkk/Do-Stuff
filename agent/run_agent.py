@@ -16,8 +16,9 @@ from helpers.agent.save_memories_and_exit import save_memories_and_exit
 from lib.exceptions import ConfirmationRequired
 from helpers.agent.append_step import append_step
 import copy
+from lib.mcp_client import MCPClient
 
-async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_store: MemoryStore, system_instructions:str) -> None:
+async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_store: MemoryStore, system_instructions:str, mcp_client: MCPClient) -> None:
     session_id_var.set(session_id)
     steps_history = await store.load(session_id)
     last_input_tokens = 0
@@ -141,7 +142,7 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
                             print(f"-> Calling local tool: {fn_name}({fn_args})")
             
                         results = await asyncio.gather(
-                            *(run_tool(fn_name=fn_name, fn_args=dict(fn_args)) for fn_name, fn_args, _ in function_calls),
+                            *(run_tool(fn_name=fn_name, fn_args=dict(fn_args), mcp_client=mcp_client) for fn_name, fn_args, _ in function_calls),
                             return_exceptions=True,
                         )
 
@@ -153,7 +154,7 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
                         
                                 if confirm.strip().lower() == "y":
                                     resumed_args = {**fn_args, **result.resume_args}
-                                    result = await run_tool(fn_name=fn_name, fn_args=resumed_args)
+                                    result = await run_tool(fn_name=fn_name, fn_args=resumed_args, mcp_client=mcp_client)
                                 else:
                                     result = "Error: User declined to allow this action."
                         
