@@ -14,6 +14,8 @@ from helpers.agent.get_model_token_limit import get_model_token_limit
 from lib.memory_store import MemoryStore
 from helpers.agent.save_memories_and_exit import save_memories_and_exit
 from lib.exceptions import ConfirmationRequired
+from helpers.agent.append_step import append_step
+import copy
 
 async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_store: MemoryStore, system_instructions:str) -> None:
     session_id_var.set(session_id)
@@ -21,6 +23,9 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
     last_input_tokens = 0
     token_limit = await get_model_token_limit()
     context_token_threshold = int(token_limit * 0.8)
+    keep_recent_token_budget = int(context_token_threshold * 0.15)
+    working_history = copy.deepcopy(steps_history)
+    compaction_notes = ""
 
     try:
         while True:
@@ -56,15 +61,9 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
                     "type": "user_input",
                     "content": [{"type": "text", "text": user_text}],
                 }
+           
+            await append_step(user_step, steps_history, working_history, session_id, store)
     
-            steps_history.append(
-                user_step
-            )
-            await store.append(session_id, user_step)
-    
-            # memories = await memory_store.query(user_id, query_text=user_text, top_k=5)
-            # memory_text = "\n".join(f"- {m}" for m in memories)
-
             memories = await memory_store.query(user_id, query_text=user_text, top_k=5)
             memory_text = "\n".join(f"- {m['key']}: {m['value']}" for m in memories)
     
@@ -87,12 +86,18 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
     
                     with tracer.start_as_current_span("iteration") as iter_span:
                         iter_span.set_attribute("iteration_number", iteration)
-    
+
+                        # print(f"LAST INPUT TOKENS: {last_input_tokens}")
+
                         if last_input_tokens > context_token_threshold:
-                            steps_history = await compact_context(steps_history)
-    
+                            working_history, new_summary = await compact_context(working_history, keep_recent_token_budget)
+                            compaction_notes = f"{compaction_notes}\n{new_summary}".strip()
+
+                            with tracer.start_as_current_span("context_compaction") as compaction_span:
+                                compaction_span.set_attribute("steps_after", len(working_history))
+                        
                         # agent call  
-                        interaction = await call_agent(steps_history=steps_history, system_instruction=dynamic_system_instruction)
+                        interaction = await call_agent(steps_history=working_history, system_instruction=dynamic_system_instruction + (f"\n\n[Summary of earlier conversation]: {compaction_notes}" if compaction_notes else ""))
     
                         usage = getattr(interaction, "usage", None)
                         if usage:
@@ -106,8 +111,7 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
             
                         for step in interaction_steps:
                             dumped = step.model_dump()
-                            steps_history.append(dumped)
-                            await store.append(session_id, dumped)
+                            await append_step(dumped, steps_history, working_history, session_id, store)
             
                         last_step = interaction_steps[-1]
                         if getattr(last_step, "type", None) == "model_output":
@@ -165,25 +169,9 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
                                 "id": fn_id,
                                 "type": "function_result",
                             }
-                            steps_history.append(result_step)
-                            await store.append(session_id, result_step)
+                            await append_step(result_step, steps_history, working_history, session_id, store)
                             iter_span.set_status(Status(StatusCode.OK))
             
-                        # for (fn_name, _, fn_id), result in zip(function_calls, results):
-                        #     if isinstance(result, Exception):
-                        #         result = f"Error: {result}"
-            
-                        #     result_step = {
-                        #         "name": fn_name,
-                        #         "result": result,
-                        #         "id": fn_id,
-                        #         "type": "function_result",
-                        #     }
-                        #     steps_history.append(result_step)
-                        #     await store.append(session_id, result_step)   
-    
-                        #     iter_span.set_status(Status(StatusCode.OK)) 
-    
                 else:
                     turn_span.set_attribute("outcome", "max_iterations_exceeded")  
                     turn_span.set_status(Status(StatusCode.ERROR, "max_iterations_exceeded"))
