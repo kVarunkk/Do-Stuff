@@ -43,10 +43,6 @@ class MCPClient:
         headers: Optional[Dict[str, str]] = None,
     ) -> None:
         """Establishes an async stdio session with an MCP server and updates tool index."""
-
-        # print("Im inside connect_to_server")
-        # print(f"Connecting to server '{server_name}' with transport '{transport}'... url: {url}, command: {command}, args: {args}, env: {env}, headers: {headers}")
-
         
         if server_name in self.server_stacks:
                 self._retired_stacks.append(self.server_stacks[server_name])
@@ -64,8 +60,6 @@ class MCPClient:
         if transport in ("http", "streamable-http", "sse") or url:
             if not url:
                 raise ValueError(f"Server '{server_name}' requires a 'url' for transport '{transport}'.")
-
-            # print(f"Connecting to remote MCP server '{server_name}' at {url}...")
 
             if "Authorization" not in req_headers:
                 token = await self._get_or_refresh_token(server_name, url)
@@ -163,20 +157,25 @@ class MCPClient:
         }
 
     async def cleanup(self) -> None:
-        for stack in self._retired_stacks:
+    # 1. First-In, Last-Out (FILO) teardown for active stacks
+    # Reversing active stacks guarantees child/dependent contexts close before parents
+        for name, stack in reversed(list(self.server_stacks.items())):
             try:
                 await stack.aclose()
-            except Exception as e:
+            except BaseException as e:
+                print(f"Non-fatal: error closing active stack '{name}': {e}")
+    
+        # 2. Teardown retired stacks in FILO order
+        for stack in reversed(self._retired_stacks):
+            try:
+                await stack.aclose()
+            except BaseException as e:
                 print(f"Non-fatal: error closing retired stack: {e}")
-
-        for stack in self.server_stacks.values():
-            try:
-                await stack.aclose()
-            except Exception as e:
-                print(f"Non-fatal: error closing active stack: {e}")
-           
+    
+        # 3. Clear stored references
         self._retired_stacks.clear()
+        self.server_stacks.clear()
         self.servers.clear()
-        self.mcp_tools.clear()   
+        self.mcp_tools.clear()
 
 

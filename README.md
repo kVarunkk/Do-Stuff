@@ -33,6 +33,7 @@
   - update `tools/definitions.py`
 - New files will be created in the `agent_workspace` directory
 - Add skills in the `skill` directory. Sample skills present. Refer [this](https://agentskills.io/home) for more info.
+- To inspect traces, paste the content of `trace.json` [here](https://tracekit.dev/tools/trace-visualizer)
 
 ### Long Term Memory
 

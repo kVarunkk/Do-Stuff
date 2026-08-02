@@ -1,7 +1,7 @@
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import (
-    BatchSpanProcessor,
+    SimpleSpanProcessor,
     SpanExporter, 
     SpanExportResult
 )
@@ -11,6 +11,9 @@ from typing import Any, Callable
 from opentelemetry.trace import Status, StatusCode
 import contextvars
 import json
+from typing import Sequence
+from opentelemetry.sdk.trace import ReadableSpan
+import os 
 
 session_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("session_id", default="unknown")
 turn_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("turn_id", default="unknown")
@@ -112,42 +115,94 @@ def traced(span_name: str | None = None):
     return decorator
 
 
-class JSONLFileExporter(SpanExporter):
-    def __init__(self, filepath: str):
+class SingleFileOTLPExporter(SpanExporter):
+    def __init__(self, filepath: str = "trace.json"):
         self.filepath = filepath
+        self._captured_spans = []
+        
+        # 1. Load existing spans from disk if trace.json already exists
+        if os.path.exists(self.filepath) and os.path.getsize(self.filepath) > 0:
+            try:
+                with open(self.filepath, "r", encoding="utf-8") as f:
+                    existing_data = json.load(f)
+                    # Extract previous spans from the OTLP structure
+                    self._captured_spans = (
+                        existing_data.get("resourceSpans", [])[0]
+                        .get("scopeSpans", [])[0]
+                        .get("spans", [])
+                    )
+            except (json.JSONDecodeError, KeyError, IndexError):
+                # If file is empty or corrupted, start fresh
+                self._captured_spans = []
 
-    def export(self, spans: Any) -> SpanExportResult:
-        with open(self.filepath, "a") as f:
-            for span in spans:
-                context = getattr(span, "context", None)
-                parent = getattr(span, "parent", None)
-                start_time = getattr(span, "start_time", None)
-                end_time = getattr(span, "end_time", None)
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        # 2. Append new spans to the existing list
+        for span in spans:
+            context = span.context
+            parent = span.parent
 
-                status_code = getattr(getattr(span, "status", None), "status_code", None)
-                status_name = status_code.name if status_code is not None else None
+            otlp_attributes = []
+            if span.attributes:
+                for k, v in span.attributes.items():
+                    if isinstance(v, bool):
+                        val_obj = {"boolValue": v}
+                    elif isinstance(v, int):
+                        val_obj = {"intValue": str(v)}
+                    elif isinstance(v, float):
+                        val_obj = {"doubleValue": v}
+                    else:
+                        val_obj = {"stringValue": str(v)}
+                    otlp_attributes.append({"key": k, "value": val_obj})
 
-                record = {
-                    "name": getattr(span, "name", None),
-                    "trace_id": format(context.trace_id, "032x") if context is not None else None,
-                    "span_id": format(context.span_id, "016x") if context is not None else None,
-                    "parent_id": format(parent.span_id, "016x") if parent is not None else None,
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "duration_ns": end_time - start_time if isinstance(start_time, int) and isinstance(end_time, int) else None,
-                    "status": status_name,
-                    "attributes": dict(getattr(span, "attributes", {}).items()),
+            trace_id = format(context.trace_id, "032x") if context is not None else ""
+            span_id = format(context.span_id, "016x") if context is not None else ""
+
+            otlp_span = {
+                "traceId": trace_id,
+                "spanId": span_id,
+                "parentSpanId": format(parent.span_id, "016x") if parent else "",
+                "name": span.name,
+                "kind": 1,
+                "startTimeUnixNano": str(span.start_time),
+                "endTimeUnixNano": str(span.end_time),
+                "attributes": otlp_attributes,
+                "status": {
+                    "code": 1 if span.status.is_ok else (2 if span.status.status_code.name == "ERROR" else 0)
                 }
-                f.write(json.dumps(record) + "\n")
+            }
+            self._captured_spans.append(otlp_span)
+
+        # 3. Write back the complete accumulated history into trace.json
+        payload = {
+            "resourceSpans": [
+                {
+                    "resource": {
+                        "attributes": [
+                            {"key": "service.name", "value": {"stringValue": "my-agent"}}
+                        ]
+                    },
+                    "scopeSpans": [
+                        {
+                            "scope": {"name": "agent-tracer"},
+                            "spans": self._captured_spans
+                        }
+                    ]
+                }
+            ]
+        }
+
+        with open(self.filepath, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+
         return SpanExportResult.SUCCESS
 
     def shutdown(self):
-        pass        
-
+        pass
 
 
 provider = TracerProvider()
-provider.add_span_processor(BatchSpanProcessor(JSONLFileExporter("traces.jsonl")))
+exporter = SingleFileOTLPExporter(filepath="trace.json")
+provider.add_span_processor(SimpleSpanProcessor(exporter))
 trace.set_tracer_provider(provider)
 
 tracer = trace.get_tracer("agent") 

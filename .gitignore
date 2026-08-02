@@ -2,7 +2,7 @@
 .env.local
 venv/
 .venv/
-traces.jsonl
+trace.json
 *.log
 __pycache__/
 chroma_data
