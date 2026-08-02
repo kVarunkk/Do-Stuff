@@ -1,5 +1,5 @@
 from typing import Any
-from lib.mcp_client import MCPClient
+from lib.mcp.mcp_client import MCPClient
 import json 
 
 def get_mcp_tool_details(name: str) -> dict[str, Any]:

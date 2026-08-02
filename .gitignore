@@ -7,3 +7,4 @@ traces.jsonl
 __pycache__/
 chroma_data
 agent_workspace
+mcp_client_registrations.json

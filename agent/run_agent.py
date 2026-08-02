@@ -1,4 +1,4 @@
-from lib.session_store import  SessionStore
+from lib.memory.session_store import  SessionStore
 from lib.tracing import  session_id_var, turn_id_var
 import asyncio
 import uuid
@@ -11,12 +11,12 @@ from agent.call_agent import call_agent
 from agent.run_tool import run_tool
 from helpers.agent.manage_context import compact_context
 from helpers.agent.get_model_token_limit import get_model_token_limit
-from lib.memory_store import MemoryStore
+from lib.memory.memory_store import MemoryStore
 from helpers.agent.save_memories_and_exit import save_memories_and_exit
 from lib.exceptions import ConfirmationRequired
 from helpers.agent.append_step import append_step
 import copy
-from lib.mcp_client import MCPClient
+from lib.mcp.mcp_client import MCPClient
 
 async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_store: MemoryStore, system_instructions:str, mcp_client: MCPClient) -> None:
     session_id_var.set(session_id)

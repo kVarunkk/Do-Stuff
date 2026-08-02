@@ -6,7 +6,7 @@ import asyncio
 from tools.mcp.call_mcp_tool import _impl_call_mcp_tool
 from tools.mcp.get_mcp_tool_details import _impl_get_mcp_tool_details
 from tools.mcp.search_mcp_tools import _impl_search_mcp_tools
-from lib.mcp_client import MCPClient
+from lib.mcp.mcp_client import MCPClient
 
 
 MCP_META_TOOLS = {

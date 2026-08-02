@@ -8,7 +8,7 @@
 - long term memory
 - context management
 - skill support
-- mcp servers support (stdio)
+- mcp servers support (stdio and http (Dynamic Client Registration support only))
 
 ## Setup
 
@@ -40,4 +40,4 @@
 
 ### MCP Servers
 
-- Add mcp servers in the `mcp_config.json`
+- Add mcp servers in the `mcp_config.json`. Sample remote and local servers present.

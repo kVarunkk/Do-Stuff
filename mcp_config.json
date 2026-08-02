@@ -1,25 +1,14 @@
 {
   "mcpServers": {
-    "filesystem": {
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "."
-      ]
+    "gethired": {
+      "transport": "http",
+      "url": "https://gethired-mcp-server.onrender.com"
     },
-    "everything": {
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-everything"
-      ]
+    "postman": {
+      "transport": "http",
+      "url": "https://mcp.postman.com/minimal"
     },
-   "github": {
+     "github": {
       "command": "cmd",
       "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-github"],
       "env": {

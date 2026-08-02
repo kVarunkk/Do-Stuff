@@ -49,30 +49,3 @@ class ChromaMemoryStore(MemoryStore):
             {"key": meta.get("key"), "value": doc}
             for doc, meta in zip(documents, metadatas)
         ]    
-
-
-    # async def query(self, user_id: str, query_text: str, top_k: int = 5, min_similarity: float = 0.3) -> list[str]:
-    #     # print(f"INSIDE QUERY: {user_id}, {query_text}")
-
-    #     results = self._collection.query(
-    #         query_texts=[query_text],
-    #         n_results=top_k,
-    #         where={"user_id": user_id},
-    #     )
-
-    #     print(f"QUERY RESULTS: {results}")
-
-    #     raw_docs = results.get("documents") or [[]]
-    #     raw_dists = results.get("distances") or [[]]
-        
-    #     documents = raw_docs[0] if raw_docs and raw_docs[0] is not None else []
-    #     distances = raw_dists[0] if raw_dists and raw_dists[0] is not None else []
-
-    #     print(f"QUERY DOCUMENTS: {documents}")
-    #     print(f"QUERY DISTANCES: {distances}")
-
-
-    #     return [
-    #         doc for doc, dist in zip(documents, distances)
-    #         if (1 - dist) >= min_similarity  
-    #     ]

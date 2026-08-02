@@ -1,4 +1,4 @@
-from lib.session_store import  SessionStore
+from lib.memory.session_store import  SessionStore
 
 async def append_step(step: dict, steps_history: list, working_history: list, session_id: str, store: SessionStore) -> None:
     steps_history.append(step)
