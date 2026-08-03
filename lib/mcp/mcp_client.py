@@ -162,6 +162,7 @@ class MCPClient:
         for name, stack in reversed(list(self.server_stacks.items())):
             try:
                 await stack.aclose()
+                print("Closed active stack for server:", name)
             except BaseException as e:
                 print(f"Non-fatal: error closing active stack '{name}': {e}")
     
@@ -169,6 +170,7 @@ class MCPClient:
         for stack in reversed(self._retired_stacks):
             try:
                 await stack.aclose()
+                print("Closed retired stack.")
             except BaseException as e:
                 print(f"Non-fatal: error closing retired stack: {e}")
     

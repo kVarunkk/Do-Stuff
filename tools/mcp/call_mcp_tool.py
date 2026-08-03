@@ -58,14 +58,6 @@ async def _impl_call_mcp_tool(
 
         mcp_client._tokens.pop(server_name, None)
 
-        # Re-establish a clean session context (this will automatically fetch a fresh token)
-        # await mcp_client.connect_to_server(
-        #     server_name=server_name,
-        #     transport=server_info.get("transport", "streamable-http"),
-        #     url=url,
-        #     headers=server_info.get("headers")
-        # )
-
         try:
             await asyncio.wait_for(
                 mcp_client.connect_to_server(

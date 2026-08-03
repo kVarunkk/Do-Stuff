@@ -33,7 +33,6 @@
   - update `tools/definitions.py`
 - New files will be created in the `agent_workspace` directory
 - Add skills in the `skill` directory. Sample skills present. Refer [this](https://agentskills.io/home) for more info.
-- To inspect traces, paste the content of `trace.json` [here](https://tracekit.dev/tools/trace-visualizer)
 
 ### Long Term Memory
 
@@ -42,3 +41,18 @@
 ### MCP Servers
 
 - Add mcp servers in the `mcp_config.json`. Sample remote and local servers present.
+
+### Observability
+
+- Use this command to spin up a Jaeger container:
+  ``docker run -d --name jaeger `
+-e SPAN_STORAGE_TYPE=badger `
+-e BADGER_EPHEMERAL=false `
+-e BADGER_DIRECTORY_VALUE=/badger/data `
+-e BADGER_DIRECTORY_KEY=/badger/key `
+-v ${PWD}/jaeger_data:/badger `
+-p 16686:16686 `
+-p 4317:4317 `
+-p 4318:4318 `
+jaegertracing/all-in-one:latest``
+- Open `http://localhost:16686` on your browser to view live traces.

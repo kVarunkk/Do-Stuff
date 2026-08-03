@@ -72,9 +72,6 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
             if memory_text:
                 dynamic_system_instruction += f"\n\nRelevant context about this user:\n{memory_text}"
     
-    
-            # print(f'SYSTEM INSTRUCTIONS: {dynamic_system_instruction}')
-                
             iteration = 0
     
             with tracer.start_as_current_span("turn") as turn_span:
@@ -87,8 +84,6 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
     
                     with tracer.start_as_current_span("iteration") as iter_span:
                         iter_span.set_attribute("iteration_number", iteration)
-
-                        # print(f"LAST INPUT TOKENS: {last_input_tokens}")
 
                         if last_input_tokens > context_token_threshold:
                             working_history, new_summary = await compact_context(working_history, keep_recent_token_budget)

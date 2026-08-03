@@ -39,8 +39,6 @@ async def extract_memories(steps_history: list[dict]) -> list[dict]:
 
     output_text = getattr(interaction, "output_text", "") or ""
 
-    print(f"OUTPUT TEXT: {output_text}")
-
     try:
         cleaned = output_text.strip().removeprefix("```json").removesuffix("```").strip()
         facts = json.loads(cleaned)

@@ -42,9 +42,6 @@ class OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
                 for key, value in body_params.items():
                     query.setdefault(key, value)  
     
-        # print(f"Received OAuth callback ({self.command}): {self.path}")
-        # print(f"Parsed params: {query}")
-    
         if "code" in query:
             OAuthCallbackHandler.auth_code = query["code"][0]
             self.send_response(200)
@@ -180,7 +177,6 @@ async def authenticate_via_oauth(mcp_server_url: str, www_auth_header: str, regi
     await asyncio.to_thread(lambda: _wait_for_callback(server))
 
     code = OAuthCallbackHandler.auth_code
-    # print(f"CODE BEFORE TOKEN EXCHANGE: {code!r}")
 
     async with httpx.AsyncClient() as client:
         token_payload = {
@@ -190,9 +186,7 @@ async def authenticate_via_oauth(mcp_server_url: str, www_auth_header: str, regi
             "redirect_uri": REDIRECT_URI,
             "code_verifier": code_verifier,
         }
-        # print(f"TOKEN PAYLOAD: {token_payload}")
         res = await client.post(token_endpoint, data=token_payload)
-        # print(f"TOKEN EXCHANGE RESPONSE: {res.status_code} - {res.text}")
         res.raise_for_status()
 
         token_data = res.json()

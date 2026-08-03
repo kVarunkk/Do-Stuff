@@ -1,19 +1,14 @@
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import (
-    SimpleSpanProcessor,
-    SpanExporter, 
-    SpanExportResult
-)
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource, SERVICE_NAME
+from opentelemetry.trace import Status, StatusCode
 import functools
 import inspect
 from typing import Any, Callable
-from opentelemetry.trace import Status, StatusCode
 import contextvars
 import json
-from typing import Sequence
-from opentelemetry.sdk.trace import ReadableSpan
-import os 
 
 session_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("session_id", default="unknown")
 turn_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("turn_id", default="unknown")
@@ -115,94 +110,23 @@ def traced(span_name: str | None = None):
     return decorator
 
 
-class SingleFileOTLPExporter(SpanExporter):
-    def __init__(self, filepath: str = "trace.json"):
-        self.filepath = filepath
-        self._captured_spans = []
-        
-        # 1. Load existing spans from disk if trace.json already exists
-        if os.path.exists(self.filepath) and os.path.getsize(self.filepath) > 0:
-            try:
-                with open(self.filepath, "r", encoding="utf-8") as f:
-                    existing_data = json.load(f)
-                    # Extract previous spans from the OTLP structure
-                    self._captured_spans = (
-                        existing_data.get("resourceSpans", [])[0]
-                        .get("scopeSpans", [])[0]
-                        .get("spans", [])
-                    )
-            except (json.JSONDecodeError, KeyError, IndexError):
-                # If file is empty or corrupted, start fresh
-                self._captured_spans = []
+# 1. Define Resource attributes (Service Name for Jaeger UI)
+resource = Resource.create({
+    SERVICE_NAME: "my-agent"
+})
 
-    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
-        # 2. Append new spans to the existing list
-        for span in spans:
-            context = span.context
-            parent = span.parent
+# 2. Initialize TracerProvider with Resource
+provider = TracerProvider(resource=resource)
 
-            otlp_attributes = []
-            if span.attributes:
-                for k, v in span.attributes.items():
-                    if isinstance(v, bool):
-                        val_obj = {"boolValue": v}
-                    elif isinstance(v, int):
-                        val_obj = {"intValue": str(v)}
-                    elif isinstance(v, float):
-                        val_obj = {"doubleValue": v}
-                    else:
-                        val_obj = {"stringValue": str(v)}
-                    otlp_attributes.append({"key": k, "value": val_obj})
+# 3. Configure the standard OTLP Exporter
+otlp_exporter = OTLPSpanExporter(
+    endpoint="localhost:4317", 
+    insecure=True
+)
 
-            trace_id = format(context.trace_id, "032x") if context is not None else ""
-            span_id = format(context.span_id, "016x") if context is not None else ""
+# 4. Use BatchSpanProcessor for optimal async trace exporting
+provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
 
-            otlp_span = {
-                "traceId": trace_id,
-                "spanId": span_id,
-                "parentSpanId": format(parent.span_id, "016x") if parent else "",
-                "name": span.name,
-                "kind": 1,
-                "startTimeUnixNano": str(span.start_time),
-                "endTimeUnixNano": str(span.end_time),
-                "attributes": otlp_attributes,
-                "status": {
-                    "code": 1 if span.status.is_ok else (2 if span.status.status_code.name == "ERROR" else 0)
-                }
-            }
-            self._captured_spans.append(otlp_span)
-
-        # 3. Write back the complete accumulated history into trace.json
-        payload = {
-            "resourceSpans": [
-                {
-                    "resource": {
-                        "attributes": [
-                            {"key": "service.name", "value": {"stringValue": "my-agent"}}
-                        ]
-                    },
-                    "scopeSpans": [
-                        {
-                            "scope": {"name": "agent-tracer"},
-                            "spans": self._captured_spans
-                        }
-                    ]
-                }
-            ]
-        }
-
-        with open(self.filepath, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
-
-        return SpanExportResult.SUCCESS
-
-    def shutdown(self):
-        pass
-
-
-provider = TracerProvider()
-exporter = SingleFileOTLPExporter(filepath="trace.json")
-provider.add_span_processor(SimpleSpanProcessor(exporter))
+# 5. Set global tracer provider
 trace.set_tracer_provider(provider)
-
-tracer = trace.get_tracer("agent") 
+tracer = trace.get_tracer("agent")
