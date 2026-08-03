@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "gethired": {
+      "transport": "http",
+      "url": "https://gethired-mcp-server.onrender.com"
+    },
+    "postman": {
+      "transport": "http",
+      "url": "https://mcp.postman.com/minimal"
+    },
+     "github": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your github personal access token"
+      }
+    }
+  }
+}

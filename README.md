@@ -40,7 +40,7 @@
 
 ### MCP Servers
 
-- Add mcp servers in the `mcp_config.json`. Sample remote and local servers present.
+- Create and add mcp servers in `mcp_config.json`. Sample remote and local servers are present in `mcp_config_sample.json`.
 
 ### Observability
 
