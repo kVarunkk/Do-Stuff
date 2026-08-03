@@ -34,9 +34,13 @@
 - New files will be created in the `agent_workspace` directory
 - Add skills in the `skill` directory. Sample skills present. Refer [this](https://agentskills.io/home) for more info.
 
+### Short Term Memory
+
+- Uses SQLite for Storage, In-Memory Storage also available.
+
 ### Long Term Memory
 
-- Long term memories are saved on exit.
+- Long term memories are saved on exit in ChromaDB.
 
 ### MCP Servers
 

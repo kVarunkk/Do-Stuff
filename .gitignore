@@ -8,3 +8,4 @@ chroma_data
 agent_workspace
 mcp_client_registrations.json
 mcp_config.json
+agent_sessions.db

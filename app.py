@@ -1,5 +1,4 @@
 from lib.mcp.mcp_tool_registry_store import MCPToolRegistryStore
-from lib.memory.session_store import InMemorySessionStore
 import asyncio
 import uuid
 import sys
@@ -12,21 +11,31 @@ from helpers.agent.constants import SYSTEM_INSTRUCTIONS
 from lib.mcp.mcp_client import MCPClient
 from helpers.mcp.load_mcp_config import load_mcp_config
 from lib.mcp.mcp_client_registration_store import MCPClientRegistrationStore
+from lib.memory.session_store import SQLiteSessionStore
 
 async def main(session_id: str, user_id: str, system_instructions: str):
     client = get_client()
-    store = InMemorySessionStore()
+    store = SQLiteSessionStore(db_path="agent_sessions.db")
+
+    existing_history = await store.load(session_id)
+    if existing_history:
+        print(f"🔄 Resuming session '{session_id}' with {len(existing_history)} existing step(s).")
+    else:
+        print(f"✨ Starting brand new session '{session_id}'.")
+
+
     memory_store = ChromaMemoryStore()
     mcp_registration_store = MCPClientRegistrationStore()
     mcp_tool_registry_store = MCPToolRegistryStore()
     mcp_client = MCPClient(registration_store=mcp_registration_store, tool_registry_store=mcp_tool_registry_store)
     mcp_servers = load_mcp_config("mcp_config.json")
 
+    
+
     try:
         if mcp_servers:
             print("\nConnecting to MCP servers from mcp_config.json...")
             for server_name, server_cfg in mcp_servers.items():
-                # 1. Extract all configuration options
                 transport = server_cfg.get("transport", "stdio")
                 command = server_cfg.get("command")
                 args = server_cfg.get("args", [])
@@ -34,7 +43,6 @@ async def main(session_id: str, user_id: str, system_instructions: str):
                 url = server_cfg.get("url")
                 headers = server_cfg.get("headers")
         
-                # 2. Validation check based on transport type
                 if transport == "stdio" and not command and not url:
                     print(f"Skipping '{server_name}': Missing 'command' field for stdio transport.")
                     continue
@@ -43,7 +51,6 @@ async def main(session_id: str, user_id: str, system_instructions: str):
                     continue
         
                 try:
-                    # 3. Forward all options to mcp_client.connect_to_server
                     await mcp_client.connect_to_server(
                         server_name=server_name,
                         transport=transport,
@@ -120,7 +127,7 @@ if __name__ == "__main__":
     print(f"USER ID: {user_id}\n")
     #  5b866b35-a41a-4907-863f-412d8e6bea8c
     print(f"SESSION ID: {session_id}\n")
-
+    # b043ef76-6a61-478e-894a-8585cc29e2d4
     try:
         asyncio.run(main(session_id, user_id, system_instructions))
     except KeyboardInterrupt:
