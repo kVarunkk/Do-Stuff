@@ -15,6 +15,7 @@
 - create a `.env` in the root and refer `.env.example` for the variables
 - create and activate a `venv`
 - run `pip install -r requirements.txt`
+- create a `DOSTUFF.md` for giving your agent a personality. Take inspiration from `DOSTUFF.sample.md`
 - run `python app.py`
 
 ## Tools
@@ -23,7 +24,6 @@
 - `read_file`
 - `list_files`
 - `delete_file`
-- `read_skill`
 
 ## Guidelines
 

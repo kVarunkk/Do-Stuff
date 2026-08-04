@@ -1,3 +1,4 @@
+from helpers.agent.load_identity import load_identity
 from lib.mcp.mcp_tool_registry_store import MCPToolRegistryStore
 import asyncio
 import uuid
@@ -23,14 +24,11 @@ async def main(session_id: str, user_id: str, system_instructions: str):
     else:
         print(f"✨ Starting brand new session '{session_id}'.")
 
-
     memory_store = ChromaMemoryStore()
     mcp_registration_store = MCPClientRegistrationStore()
     mcp_tool_registry_store = MCPToolRegistryStore()
     mcp_client = MCPClient(registration_store=mcp_registration_store, tool_registry_store=mcp_tool_registry_store)
     mcp_servers = load_mcp_config("mcp_config.json")
-
-    
 
     try:
         if mcp_servers:
@@ -103,8 +101,10 @@ if __name__ == "__main__":
         f"- name: {s['name']}\n  description: {s['description']}\n  location: {s['location']}"
         for s in skills
     )
+    identity = load_identity()
 
     system_instructions = SYSTEM_INSTRUCTIONS.format(
+        dostuff_identity=identity,
         skills_summary=skills_summary or "(none available)"
     )
 
