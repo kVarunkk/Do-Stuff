@@ -25,11 +25,42 @@ Conversation:
 {conversation}
 """
 
+def format_transcript(steps_history: list[dict]) -> str:
+    """Extracts text messages from steps history matching the user_input / model_output format."""
+    lines = []
+
+    role_map = {
+        "user_input": "User",
+        "model_output": "Model"
+    }
+
+    for step in steps_history:
+        step_type = step.get("type", "")
+        role = role_map.get(step_type, step_type.capitalize())
+        content_items = step.get("content", [])
+
+        if not isinstance(content_items, list):
+            continue
+
+        text_parts = [
+            item.get("text", "")
+            for item in content_items
+            if isinstance(item, dict) 
+            and item.get("type") == "text" 
+            and item.get("text")
+        ]
+
+        if text_parts:
+            combined_text = "\n".join(text_parts).strip()
+            if combined_text:
+                lines.append(f"{role}: {combined_text}")
+
+    return "\n".join(lines)
 
 async def extract_memories(steps_history: list[dict]) -> list[dict]:
     client = get_client()
 
-    conversation_text = json.dumps(steps_history, default=str)
+    conversation_text = format_transcript(steps_history)
     prompt = EXTRACTION_PROMPT.format(conversation=conversation_text)
 
     interaction = await client.interactions.create(

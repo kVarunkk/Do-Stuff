@@ -18,7 +18,7 @@ from helpers.agent.append_step import append_step
 import copy
 from lib.mcp.mcp_client import MCPClient
 
-async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_store: MemoryStore, system_instructions:str, mcp_client: MCPClient) -> None:
+async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_store: MemoryStore, system_instructions:str, mcp_client: MCPClient, current_session_history: list) -> None:
     session_id_var.set(session_id)
     steps_history = await store.load(session_id)
     last_input_tokens = 0
@@ -38,7 +38,7 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
             command = user_text.strip().lower()
     
             if command == "/exit":
-                await save_memories_and_exit(steps_history, user_id, memory_store)
+                await save_memories_and_exit(current_session_history, user_id, memory_store)
                 break
     
             if command == "/history":
@@ -63,7 +63,7 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
                     "content": [{"type": "text", "text": user_text}],
                 }
            
-            await append_step(user_step, steps_history, working_history, session_id, store)
+            await append_step(user_step, steps_history, working_history, current_session_history, session_id, store)
     
             memories = await memory_store.query(user_id, query_text=user_text, top_k=5)
             memory_text = "\n".join(f"- {m['key']}: {m['value']}" for m in memories)
@@ -107,7 +107,7 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
             
                         for step in interaction_steps:
                             dumped = step.model_dump()
-                            await append_step(dumped, steps_history, working_history, session_id, store)
+                            await append_step(dumped, steps_history, working_history, current_session_history, session_id, store)
             
                         last_step = interaction_steps[-1]
                         if getattr(last_step, "type", None) == "model_output":
@@ -165,7 +165,7 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
                                 "id": fn_id,
                                 "type": "function_result",
                             }
-                            await append_step(result_step, steps_history, working_history, session_id, store)
+                            await append_step(result_step, steps_history, working_history, current_session_history, session_id, store)
                             iter_span.set_status(Status(StatusCode.OK))
             
                 else:

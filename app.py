@@ -29,6 +29,7 @@ async def main(session_id: str, user_id: str, system_instructions: str):
     mcp_tool_registry_store = MCPToolRegistryStore()
     mcp_client = MCPClient(registration_store=mcp_registration_store, tool_registry_store=mcp_tool_registry_store)
     mcp_servers = load_mcp_config("mcp_config.json")
+    current_session_history = []
 
     try:
         if mcp_servers:
@@ -73,15 +74,13 @@ async def main(session_id: str, user_id: str, system_instructions: str):
             memory_store=memory_store,
             system_instructions=system_instructions,
             mcp_client=mcp_client,
+            current_session_history=current_session_history
         )
     except (KeyboardInterrupt, asyncio.CancelledError):
         print("\nInterrupted. Saving memories before exit...")
-        recovered_history = await store.load(session_id)
-        if recovered_history:
-            await save_memories_and_exit(recovered_history, user_id, memory_store)
+        await save_memories_and_exit(current_session_history, user_id, memory_store)
     finally:
         try:
-        # Set a strict timeout on the cleanup itself so it doesn't hang indefinitely
             await asyncio.wait_for(mcp_client.cleanup(), timeout=10.0)
         except (asyncio.TimeoutError, Exception, ExceptionGroup) as e:
             print(f"⚠️ Warning: MCP client cleanup completed with warning/timeout: {e}")
