@@ -9,6 +9,7 @@
 - context management
 - skill support
 - mcp servers support (stdio and http (Dynamic Client Registration support only))
+- self-learning loop
 
 ## Setup
 
@@ -24,6 +25,7 @@
 - `read_file`
 - `list_files`
 - `delete_file`
+- `run_code`
 
 ## Guidelines
 
@@ -45,6 +47,10 @@
 ### MCP Servers
 
 - Create and add mcp servers in `mcp_config.json`. Sample remote and local servers are present in `mcp_config_sample.json`.
+
+### Self-learning Loop
+
+- At the end of each session on exit, a seperate agent loop decides if there is something in the conversation history worth learning from. If present, the agent creates a new skill for that and updates if the skill is already present using the `skill-creator` skill present in the `/skills` directory.
 
 ### Observability
 

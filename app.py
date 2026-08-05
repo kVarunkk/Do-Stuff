@@ -13,6 +13,7 @@ from lib.mcp.mcp_client import MCPClient
 from helpers.mcp.load_mcp_config import load_mcp_config
 from lib.mcp.mcp_client_registration_store import MCPClientRegistrationStore
 from lib.memory.session_store import SQLiteSessionStore
+from helpers.agent.learn_from_session import learn_from_session
 
 async def main(session_id: str, user_id: str, system_instructions: str):
     client = get_client()
@@ -76,9 +77,17 @@ async def main(session_id: str, user_id: str, system_instructions: str):
             mcp_client=mcp_client,
             current_session_history=current_session_history
         )
-    except (KeyboardInterrupt, asyncio.CancelledError):
-        print("\nInterrupted. Saving memories before exit...")
-        await save_memories_and_exit(current_session_history, user_id, memory_store)
+    except:
+        print("\nInterrupted. Saving memories and running the learning loop before exit...")
+        exit_results = await asyncio.gather(
+                            learn_from_session(current_session_history, mcp_client, session_id),
+                            save_memories_and_exit(current_session_history, user_id, memory_store),
+                            return_exceptions=True
+                        )
+        for idx, res in enumerate(exit_results):
+            if isinstance(res, Exception):
+                task_name = "Memory Saving" if idx == 0 else "Skill Learning"
+                print(f"[Exit Warning] {task_name} failed: {res}")
     finally:
         try:
             await asyncio.wait_for(mcp_client.cleanup(), timeout=10.0)

@@ -1,33 +1,31 @@
-import os
 from lib.exceptions import ConfirmationRequired
-from helpers.agent.constants import WORKSPACE_ROOT
+from helpers.tools.resolve_safe_path import resolve_safe_path
 
 def write_file(path: str, content: str, overwrite: bool = False) -> str:
-    """Writes content to a file inside the agent's workspace directory. Creates one if the file does not exists. Use this when user asks to write to a file or create one.
+    """Writes content to a file inside the project directory. Creates the file
+    if it does not exist. Use this when the user asks to write to a file or
+    create one — including creating or updating a skill's SKILL.md or bundled
+    scripts as part of the learning loop.
 
     Args:
-        path: Relative path (including filename) to write, e.g. 'blog_post.md' or
-            'reports/summary.txt'. Must resolve inside the workspace directory.
+        path: Path relative to the project root, e.g. 'agent_workspace/blog_post.md'
+            or 'skills/my-skill/SKILL.md'. Always include the top-level folder
+            ('agent_workspace/' or 'skills/') as part of the path — do not omit it.
         content: The text content to write to the file.
-        overwrite: Internal flag used by the harness when resuming after user approval.
-            Do not set this manually — leave it as the default (False); the harness will retry with this set to True only after the user has explicitly confirmed. 
+        overwrite: Internal flag used by the harness when resuming after user
+            approval. Do not set this manually — leave it as the default (False);
+            the harness will retry with this set to True only after the user has
+            explicitly confirmed.
     """
-    safe_path = os.path.abspath(os.path.join(WORKSPACE_ROOT, path))
+    safe_path = resolve_safe_path(path)
 
-    if not safe_path.startswith(WORKSPACE_ROOT):
-        raise ValueError(f"Invalid path: attempted write outside workspace ({path})")
-
-    if os.path.isfile(safe_path) and not overwrite:
+    if safe_path.is_file() and not overwrite:
         raise ConfirmationRequired(
             f"File '{path}' already exists. Overwrite it?",
             resume_args={"overwrite": True},
         )
 
-    os.makedirs(os.path.dirname(safe_path), exist_ok=True)
+    safe_path.parent.mkdir(parents=True, exist_ok=True)
+    safe_path.write_text(content, encoding="utf-8")
 
-    with open(safe_path, "w", encoding="utf-8") as f:
-        f.write(content)
-
-    return f"File written: {path}"    
-
-   
+    return f"File written successfully: {path}"

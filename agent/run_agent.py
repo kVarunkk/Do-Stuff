@@ -12,7 +12,6 @@ from agent.run_tool import run_tool
 from helpers.agent.manage_context import compact_context
 from helpers.agent.get_model_token_limit import get_model_token_limit
 from lib.memory.memory_store import MemoryStore
-from helpers.agent.save_memories_and_exit import save_memories_and_exit
 from lib.exceptions import ConfirmationRequired
 from helpers.agent.append_step import append_step
 import copy
@@ -30,7 +29,7 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
 
     try:
         while True:
-            user_text = await asyncio.to_thread(input, "User: ")
+            user_text = await asyncio.to_thread(input, "\n\nUser: ")
     
             if not user_text:
                 continue
@@ -38,8 +37,7 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
             command = user_text.strip().lower()
     
             if command == "/exit":
-                await save_memories_and_exit(current_session_history, user_id, memory_store)
-                break
+                raise
     
             if command == "/history":
                 print_history(steps_history)
@@ -76,6 +74,7 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
     
             with tracer.start_as_current_span("turn") as turn_span:
                 turn_span.set_attribute("session_id", session_id)
+                turn_span.set_attribute("turn_type", "interactive_loop")
                 turn_span.set_attribute("turn_id", turn_id)
                 turn_span.set_attribute("user_input", user_text)
     
@@ -116,7 +115,7 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
                                 turn_span.set_attribute("outcome", "success")
                                 turn_span.set_status(Status(StatusCode.OK))
                                 iter_span.set_status(Status(StatusCode.OK))
-                                print(f"Agent: {final_text}")
+                                print(f"\n\nAgent: {final_text}")
                                 break
             
                         function_calls = [
@@ -169,10 +168,11 @@ async def run_agent(session_id: str, user_id: str, store: SessionStore, memory_s
                             iter_span.set_status(Status(StatusCode.OK))
             
                 else:
+                    print(f"Reached maximum iterations ({MAX_ITERATIONS}) without receiving a model output. Ending the agent loop.")
                     turn_span.set_attribute("outcome", "max_iterations_exceeded")  
                     turn_span.set_status(Status(StatusCode.ERROR, "max_iterations_exceeded"))
 
-    except KeyboardInterrupt:
+    except Exception:
         raise
 
            

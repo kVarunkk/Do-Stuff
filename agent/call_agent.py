@@ -1,6 +1,6 @@
-from typing import Any
+from google.genai._gaos.lib.compat_errors import BadRequestError
 from lib.tracing import traced
-from google.genai import types
+from google.genai._gaos.types.interactions.step import StepParam
 from lib.genai_client import get_client
 from opentelemetry import trace as otel_trace
 import os
@@ -11,15 +11,25 @@ load_dotenv()
 model = os.getenv("MODEL")
 
 @traced("model_call")
-async def call_agent(steps_history: list[types.Step], system_instruction: str) -> Any:
+async def call_agent(steps_history: list[StepParam], system_instruction: str):
     client = get_client()
-    interaction = await client.interactions.create(
-        model=model,
-        input=steps_history,
-        tools=[{"type": "function", **schema} for schema in tool_schemas],
-        store=False,
-        system_instruction=system_instruction,
-    )
+
+    async def _make_request():
+        return await client.interactions.create(
+            model=model,
+            input=steps_history,
+            tools=[{"type": "function", **schema} for schema in tool_schemas],
+            store=False,
+            system_instruction=system_instruction,
+        )
+
+    try:
+        interaction = await _make_request()
+    except BadRequestError as e:
+        if "malformed_tool_call" not in str(e):
+            raise
+        print("Model returned malformed JSON — retrying once...")
+        interaction = await _make_request()
 
     usage = getattr(interaction, "usage", None)
     if usage is not None:
@@ -27,6 +37,5 @@ async def call_agent(steps_history: list[types.Step], system_instruction: str) -
         span.set_attribute("usage.total_tokens", getattr(usage, "total_tokens", 0))
         span.set_attribute("usage.input_tokens", getattr(usage, "total_input_tokens", 0))
         span.set_attribute("usage.output_tokens", getattr(usage, "total_output_tokens", 0))
-
 
     return interaction

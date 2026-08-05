@@ -1,13 +1,15 @@
 from lib.exceptions import ConfirmationRequired
 import os
-from helpers.agent.constants import WORKSPACE_ROOT
+from helpers.tools.resolve_safe_path import resolve_safe_path
 
 def delete_file(path: str,  _confirmed: bool = False) -> str:
     """Deletes a file inside the agent's workspace. Always requires user confirmation
     before proceeding, since deletion is irreversible.
 
     Args:
-        path: Relative path to the file to delete, relative to the workspace root.
+        path: Path relative to the project root, e.g. 'agent_workspace/blog_post.md'
+            or 'skills/my-skill/SKILL.md'. Always include the top-level folder
+            ('agent_workspace/' or 'skills/') as part of the path — do not omit it.
         _confirmed: Internal flag used by the harness when resuming after user approval.
             Do not set this manually — leave it as the default (False) when initially
             requesting a deletion; the harness will retry with this set to True only
@@ -22,13 +24,9 @@ def delete_file(path: str,  _confirmed: bool = False) -> str:
             the harness should catch this, prompt the user, and retry with
             resume_args merged in to actually perform the deletion.
     """
-    safe_path = os.path.abspath(os.path.join(WORKSPACE_ROOT, path))
-    if not safe_path.startswith(WORKSPACE_ROOT):
-        raise ValueError(f"Invalid path: outside workspace ({path})")
-    if not os.path.isfile(safe_path):
-        raise FileNotFoundError(f"File not found: {path}")
+    safe_path = resolve_safe_path(path)    
 
-    if not _confirmed:
+    if safe_path.is_file() and not _confirmed:
         raise ConfirmationRequired(f"Delete file '{path}'? This cannot be undone.", resume_args={"_confirmed": True})
 
     os.remove(safe_path)
