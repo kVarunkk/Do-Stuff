@@ -16,6 +16,7 @@
 
 ## Setup
 
+- run `git clone https://github.com/kVarunkk/DoStuff.git`
 - create a `.env` in the root and refer `.env.example` for the variables
 - create and activate a `venv`
 - run `pip install -r requirements.txt`
