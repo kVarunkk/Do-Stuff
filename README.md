@@ -1,6 +1,9 @@
-# Do-Stuff
+# DoStuff
 
-## This is an opensource agent (wip)
+## AI Agent Harness
+
+<img width="1866" height="1777" alt="image" src="https://github.com/user-attachments/assets/957ee239-8c77-4e32-b28f-db39fd03f597" />
+
 
 - reAct tool calling
 - opentelemetry tracing
